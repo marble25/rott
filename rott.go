@@ -38,6 +38,13 @@ func (l *Logger) Close() error {
 	return l.file.Close()
 }
 
+func (l *Logger) Rotate() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.rotate()
+}
+
 func (l *Logger) createFile() error {
 	// Create the directory if it doesn't exist
 	abs, err := filepath.Abs(l.Filename)
@@ -50,6 +57,20 @@ func (l *Logger) createFile() error {
 	if err != nil {
 		return err
 	}
+
+	// Create the file
+	file, err := os.OpenFile(l.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(l.Filename)
+	if err != nil {
+		return err
+	}
+
+	l.size = info.Size()
+	l.file = file
 
 	return nil
 }
@@ -70,6 +91,34 @@ func (l *Logger) openFile() error {
 
 	l.size = info.Size()
 	l.file = file
+
+	return nil
+}
+
+func (l *Logger) backupFile() error {
+	err := os.Rename(l.Filename, l.Filename+".1")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (l *Logger) rotate() error {
+	// Close the current file
+	l.file.Close()
+
+	// Backup current file
+	err := l.backupFile()
+	if err != nil {
+		return err
+	}
+
+	// Open a new file
+	err = l.openFile()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
