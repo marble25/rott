@@ -2,6 +2,7 @@ package rott
 
 import (
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -18,7 +19,7 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 	defer l.mu.Unlock()
 
 	if l.file == nil {
-		l.file, err = os.OpenFile(l.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		err := l.openFile()
 		if err != nil {
 			return 0, err
 		}
@@ -35,4 +36,40 @@ func (l *Logger) Close() error {
 	defer l.mu.Unlock()
 
 	return l.file.Close()
+}
+
+func (l *Logger) createFile() error {
+	// Create the directory if it doesn't exist
+	abs, err := filepath.Abs(l.Filename)
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(abs)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (l *Logger) openFile() error {
+	// Create file if it doesn't exist
+	info, err := os.Stat(l.Filename)
+	if err != nil {
+		return l.createFile()
+	}
+
+	// Open file
+	file, err := os.OpenFile(l.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0666)
+	if err != nil {
+		// if we can't open the file, try to create it
+		return l.createFile()
+	}
+
+	l.size = info.Size()
+	l.file = file
+
+	return nil
 }
