@@ -7,12 +7,21 @@ import (
 )
 
 type Logger struct {
-	Filename string `json:"filename" yaml:"filename"`
+	Filename     string       `json:"filename" yaml:"filename"`
+	BackupOption BackupOption `json:"backup_condition" yaml:"backup_condition"`
 
 	size int64
 	file *os.File
 	mu   sync.Mutex
 }
+
+type BackupOption int
+
+const (
+	NoBackup BackupOption = iota
+	ByTime
+	BySize
+)
 
 func (l *Logger) Write(p []byte) (n int, err error) {
 	l.mu.Lock()
@@ -96,6 +105,11 @@ func (l *Logger) openFile() error {
 }
 
 func (l *Logger) backupFile() error {
+	// If backup is not enabled, return
+	if l.BackupOption == NoBackup {
+		return nil
+	}
+
 	err := os.Rename(l.Filename, l.Filename+".1")
 	if err != nil {
 		return err
