@@ -2,13 +2,15 @@ package rott
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 )
 
 type Logger struct {
-	Filename     string       `json:"filename" yaml:"filename"`
-	BackupOption BackupOption `json:"backup_condition" yaml:"backup_condition"`
+	Filename          string       `json:"filename" yaml:"filename"`
+	BackupOption      BackupOption `json:"backup_condition" yaml:"backup_condition"`
+	BackupFilePattern string       `json:"backup_file_pattern" yaml:"backup_file_pattern"`
 
 	size int64
 	file *os.File
@@ -54,9 +56,17 @@ func (l *Logger) Rotate() error {
 	return l.rotate()
 }
 
+func (l *Logger) filename() string {
+	if l.Filename != "" {
+		return l.Filename
+	}
+	tmpDir := os.TempDir()
+	return path.Join(tmpDir, "rott.log")
+}
+
 func (l *Logger) createFile() error {
 	// Create the directory if it doesn't exist
-	abs, err := filepath.Abs(l.Filename)
+	abs, err := filepath.Abs(l.filename())
 	if err != nil {
 		return err
 	}
@@ -68,12 +78,12 @@ func (l *Logger) createFile() error {
 	}
 
 	// Create the file
-	file, err := os.OpenFile(l.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0666)
+	file, err := os.OpenFile(l.filename(), os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
 
-	info, err := os.Stat(l.Filename)
+	info, err := os.Stat(l.filename())
 	if err != nil {
 		return err
 	}
@@ -86,13 +96,13 @@ func (l *Logger) createFile() error {
 
 func (l *Logger) openFile() error {
 	// Create file if it doesn't exist
-	info, err := os.Stat(l.Filename)
+	info, err := os.Stat(l.filename())
 	if err != nil {
 		return l.createFile()
 	}
 
 	// Open file
-	file, err := os.OpenFile(l.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0666)
+	file, err := os.OpenFile(l.filename(), os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0666)
 	if err != nil {
 		// if we can't open the file, try to create it
 		return l.createFile()
@@ -110,7 +120,7 @@ func (l *Logger) backupFile() error {
 		return nil
 	}
 
-	err := os.Rename(l.Filename, l.Filename+".1")
+	err := os.Rename(l.filename(), l.filename()+".1")
 	if err != nil {
 		return err
 	}
